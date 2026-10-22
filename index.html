@@ -1,0 +1,978 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pemecahan Masalah Terpadu Graf &amp; Tree — SMPN 19 Kota Bekasi</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#08172A; --bg2:#0F2A45;
+  --card:rgba(255,255,255,.07); --line:rgba(52,211,153,.28);
+  --accent:#34D399; --accent2:#FB923C; --accent3:#60A5FA; --pink:#F472B6;
+  --text:#EAF3FC; --muted:#9FB8D4;
+}
+html,body{height:100%;overflow:hidden;background:#040C16;
+  font-family:"Segoe UI",Inter,system-ui,-apple-system,"Helvetica Neue",sans-serif;
+  color:var(--text);-webkit-font-smoothing:antialiased}
+#viewport{position:fixed;inset:0;display:grid;place-items:center}
+
+/* ============ STAGE ============ */
+#stage{
+  width:1280px;height:720px;position:relative;overflow:hidden;border-radius:18px;
+  transform-origin:center center;perspective:1500px;
+  box-shadow:0 34px 90px rgba(0,0,0,.75), 0 0 0 1px rgba(52,211,153,.20),
+             inset 0 0 120px rgba(0,0,0,.35);
+  background:linear-gradient(160deg,#08172A,#0F2A45 55%,#08172A);
+}
+
+/* ============ SLIDE ============ */
+.slide{
+  position:absolute;inset:0;padding:64px 58px 58px;
+  display:flex;flex-direction:column;gap:16px;
+  opacity:0;pointer-events:none;z-index:0;
+  transition:opacity .5s ease, transform .55s cubic-bezier(.22,1,.36,1), filter .5s ease;
+  background:
+    radial-gradient(1000px 620px at 10% -10%, rgba(52,211,153,.14), transparent 62%),
+    radial-gradient(920px 560px at 96% 108%, rgba(251,146,60,.13), transparent 60%),
+    radial-gradient(700px 420px at 78% -8%, rgba(96,165,250,.10), transparent 62%),
+    linear-gradient(160deg,#08172A 0%, #0F2A45 52%, #071323 100%);
+}
+.slide::before{
+  content:'';position:absolute;inset:0;pointer-events:none;opacity:.5;
+  background-image:
+    repeating-linear-gradient(0deg, rgba(255,255,255,.028) 0 1px, transparent 1px 60px),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.028) 0 1px, transparent 1px 60px);
+  mask-image:radial-gradient(circle at 50% 45%, #000 0%, transparent 78%);
+  -webkit-mask-image:radial-gradient(circle at 50% 45%, #000 0%, transparent 78%);
+}
+.slide::after{
+  content:'';position:absolute;left:0;right:0;top:0;height:4px;
+  background:linear-gradient(90deg,var(--accent),var(--accent3) 45%,var(--accent2) 78%,var(--pink));
+  opacity:.75;
+}
+.slide.active{opacity:1;pointer-events:auto;z-index:2}
+.slide.prev{transform:translateX(-70px) scale(.965);filter:blur(7px)}
+.slide.next{transform:translateX(70px) scale(.965);filter:blur(7px)}
+
+@keyframes tr0{from{opacity:0;transform:translateY(30px) scale(.965)}to{opacity:1;transform:none}}
+@keyframes tr1{from{opacity:0;transform:translateX(96px) rotateY(-13deg)}to{opacity:1;transform:none}}
+@keyframes tr2{from{opacity:0;transform:translateX(-96px) rotateY(13deg)}to{opacity:1;transform:none}}
+@keyframes tr3{from{opacity:0;transform:scale(1.07);filter:blur(12px)}to{opacity:1;transform:none;filter:blur(0)}}
+@keyframes tr4{from{opacity:0;clip-path:inset(0 0 100% 0)}to{opacity:1;clip-path:inset(0 0 0 0)}}
+.slide.tr0.active{animation:tr0 .62s cubic-bezier(.22,1,.36,1) both}
+.slide.tr1.active{animation:tr1 .62s cubic-bezier(.22,1,.36,1) both}
+.slide.tr2.active{animation:tr2 .62s cubic-bezier(.22,1,.36,1) both}
+.slide.tr3.active{animation:tr3 .62s cubic-bezier(.22,1,.36,1) both}
+.slide.tr4.active{animation:tr4 .62s cubic-bezier(.22,1,.36,1) both}
+
+/* ============ REVEAL ============ */
+.f{opacity:0;transform:translateY(18px);
+   transition:opacity .5s ease, transform .55s cubic-bezier(.22,1,.36,1)}
+.f.show{opacity:1;transform:none}
+
+/* ============ TIPOGRAFI ============ */
+.head{display:flex;flex-direction:column;gap:7px;flex:0 0 auto}
+.eyebrow{font-size:13.5px;letter-spacing:.24em;text-transform:uppercase;
+  font-weight:800;color:var(--accent)}
+h1.title{font-size:58px;line-height:1.06;font-weight:800;letter-spacing:-.6px}
+h2.title{font-size:38px;line-height:1.14;font-weight:800;letter-spacing:-.3px}
+.sub{font-size:23px;color:var(--muted);line-height:1.45}
+.lead{font-size:22px;line-height:1.5;color:var(--text)}
+.hl{color:var(--accent);font-weight:800}
+.hl2{color:var(--accent2);font-weight:800}
+.hl3{color:var(--accent3);font-weight:800}
+.grad{background:linear-gradient(100deg,#34D399 0%,#60A5FA 46%,#FB923C 84%,#F472B6 100%);
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+
+.body{display:flex;flex-direction:column;gap:16px;flex:1;min-height:0}
+.body.center{align-items:center;justify-content:center;text-align:center}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.center .row{justify-content:center}
+
+/* ============ LIST ============ */
+ul.bullets{list-style:none;display:flex;flex-direction:column;gap:15px}
+ul.bullets li{position:relative;padding-left:38px;font-size:23px;line-height:1.34}
+ul.bullets li::before{content:'';position:absolute;left:6px;top:11px;width:13px;height:13px;
+  border-radius:4px;background:var(--accent);box-shadow:0 0 14px rgba(52,211,153,.8)}
+ul.bullets.gold li::before{background:var(--accent2);box-shadow:0 0 14px rgba(251,146,60,.8)}
+ul.bullets.blue li::before{background:var(--accent3);box-shadow:0 0 14px rgba(96,165,250,.8)}
+
+ol.steps{list-style:none;counter-reset:st;display:flex;flex-direction:column;gap:12px}
+ol.steps li{counter-increment:st;position:relative;padding-left:48px;
+  font-size:21px;line-height:1.34}
+ol.steps li::before{content:counter(st);position:absolute;left:0;top:-3px;
+  width:33px;height:33px;border-radius:50%;display:grid;place-items:center;
+  font-size:15px;font-weight:800;color:#04231A;
+  background:linear-gradient(140deg,#34D399,#60A5FA);
+  box-shadow:0 0 16px rgba(52,211,153,.45)}
+
+/* ============ GRID & CARD ============ */
+.grid{display:grid;gap:16px}
+.g2{grid-template-columns:repeat(2,1fr)}
+.g3{grid-template-columns:repeat(3,1fr)}
+.g4{grid-template-columns:repeat(4,1fr)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;
+  padding:18px 20px;backdrop-filter:blur(7px);
+  box-shadow:0 12px 30px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.05)}
+.card h3{font-size:20px;margin-bottom:7px;color:var(--accent);font-weight:800}
+.card p{font-size:17.5px;color:var(--muted);line-height:1.42}
+.card.gold{border-color:rgba(251,146,60,.36)}
+.card.gold h3{color:var(--accent2)}
+.card.blue{border-color:rgba(96,165,250,.36)}
+.card.blue h3{color:var(--accent3)}
+.card.pink{border-color:rgba(244,114,182,.36)}
+.card.pink h3{color:var(--pink)}
+.ico{font-size:30px;line-height:1;margin-bottom:9px;display:block}
+
+/* ============ CHIP / BADGE ============ */
+.chip{display:inline-block;padding:8px 16px;border-radius:999px;font-size:15px;
+  font-weight:700;background:rgba(52,211,153,.14);
+  border:1px solid rgba(52,211,153,.42);color:#8FF0CB}
+.chip.orange{background:rgba(251,146,60,.14);border-color:rgba(251,146,60,.42);color:#FFC79A}
+.chip.blue{background:rgba(96,165,250,.14);border-color:rgba(96,165,250,.42);color:#A8CDFF}
+.badge{display:inline-block;padding:7px 15px;border-radius:11px;font-size:13px;
+  font-weight:800;letter-spacing:.08em;text-transform:uppercase;
+  background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.16);color:var(--muted)}
+
+/* ============ KODE ============ */
+.code{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace;
+  font-size:17.5px;line-height:1.52;background:rgba(0,0,0,.42);
+  border-left:4px solid var(--accent);border-radius:12px;padding:16px 22px;
+  white-space:pre;color:#CFE9FF;overflow:hidden;
+  box-shadow:inset 0 0 40px rgba(52,211,153,.06)}
+.code.sm{font-size:15px;line-height:1.46}
+.code .c{color:#7FA8C9;font-style:italic}
+.code .s{color:#FFC79A}
+.code .k{color:#F472B6;font-weight:700}
+
+/* ============ FLOW ============ */
+.flow{display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:center}
+.flowchart{display:flex;flex-direction:column;gap:12px;justify-content:center;flex:1}
+.frow{display:flex;align-items:center;gap:16px;justify-content:center}
+.node{padding:13px 20px;border-radius:13px;font-size:17.5px;font-weight:700;
+  background:rgba(96,165,250,.14);border:1px solid rgba(96,165,250,.48);
+  text-align:center;line-height:1.25;
+  box-shadow:0 8px 22px rgba(0,0,0,.28)}
+.node.oval{border-radius:999px;background:rgba(52,211,153,.15);
+  border-color:rgba(52,211,153,.55);color:#A9F5DA}
+.node.diamond{width:116px;height:116px;padding:0;border-radius:16px;
+  transform:rotate(45deg);display:grid;place-items:center;
+  background:rgba(251,146,60,.15);border-color:rgba(251,146,60,.6)}
+.node.diamond span{transform:rotate(-45deg);display:block;width:112px;
+  text-align:center;font-size:13.5px;line-height:1.24;font-weight:700;color:#FFD3AE}
+.arrow{color:var(--accent);font-size:24px;font-weight:800;text-shadow:0 0 14px rgba(52,211,153,.6)}
+.branchLabel{font-size:13px;font-weight:800;letter-spacing:.12em;color:var(--accent2)}
+
+/* ============ TIMELINE ============ */
+.timeline{display:flex;gap:14px;margin-top:8px}
+.tl{flex:1;position:relative;padding:16px 12px 0;
+  border-top:3px solid rgba(52,211,153,.32);font-size:14.5px;color:var(--muted);line-height:1.3}
+.tl::before{content:'';position:absolute;top:-9px;left:0;width:15px;height:15px;
+  border-radius:50%;background:var(--accent);box-shadow:0 0 14px rgba(52,211,153,.85)}
+.tl b{display:block;color:var(--text);font-size:16px;margin-bottom:3px;font-weight:800}
+
+/* ============ TABEL ============ */
+table{width:100%;border-collapse:collapse;font-size:17.5px;border-radius:13px;
+  overflow:hidden;box-shadow:0 10px 26px rgba(0,0,0,.28)}
+th{background:rgba(52,211,153,.16);color:#BFF3DF;text-align:left;
+  padding:11px 16px;font-size:14.5px;letter-spacing:.08em;text-transform:uppercase;font-weight:800}
+td{padding:10px 16px;border-top:1px solid rgba(255,255,255,.08);color:var(--text);line-height:1.34}
+tbody tr:nth-child(even){background:rgba(255,255,255,.035)}
+table.sm td,table.sm th{padding:8px 13px;font-size:15.5px}
+
+/* ============ BUBBLE ============ */
+.bubble{position:relative;background:linear-gradient(120deg,rgba(52,211,153,.16),rgba(96,165,250,.12));
+  border:1px solid rgba(52,211,153,.45);border-radius:20px 20px 20px 6px;
+  padding:18px 26px;font-size:22px;line-height:1.4;color:#DCF6EC;max-width:1000px}
+.bubble::after{content:'';position:absolute;left:26px;bottom:-13px;width:0;height:0;
+  border:13px solid transparent;border-top-color:rgba(52,211,153,.45);border-bottom:0}
+
+/* ============ TREE ============ */
+.tree{display:flex;flex-direction:column;align-items:center;gap:14px;justify-content:center;flex:1}
+.tree .trow{display:flex;gap:38px;position:relative;padding-top:20px;align-items:flex-start}
+.tree .trow::before{content:'';position:absolute;top:0;left:14%;right:14%;height:2px;
+  background:rgba(52,211,153,.35)}
+.tree .tcol{position:relative;display:flex;flex-direction:column;align-items:center;gap:12px}
+.tree .tcol::before{content:'';position:absolute;top:-20px;left:50%;width:2px;height:20px;
+  background:rgba(52,211,153,.35)}
+.tnode{padding:10px 18px;border-radius:12px;font-size:16px;font-weight:700;
+  background:rgba(52,211,153,.14);border:1px solid rgba(52,211,153,.5);color:#A9F5DA;
+  box-shadow:0 8px 20px rgba(0,0,0,.3);text-align:center}
+.tnode.root{background:rgba(96,165,250,.18);border-color:rgba(96,165,250,.6);color:#C6E0FF;font-size:18px}
+.tnode.leaf{background:rgba(251,146,60,.13);border-color:rgba(251,146,60,.5);color:#FFD3AE;font-size:15px}
+
+/* ============ QA ============ */
+.qa{display:flex;flex-direction:column;gap:8px}
+.qa .q{font-size:18.5px;font-weight:700;color:var(--text);line-height:1.32}
+.qa .a{font-size:16.5px;color:#8FF0CB;line-height:1.32;padding-left:22px;position:relative}
+.qa .a::before{content:'✔';position:absolute;left:0;color:var(--accent)}
+
+/* ============ HUD ============ */
+#hud{position:absolute;top:0;left:0;right:0;z-index:60;display:flex;
+  justify-content:space-between;align-items:center;padding:16px 26px 0;
+  font-size:12.5px;letter-spacing:.14em;text-transform:uppercase;
+  color:rgba(159,184,212,.72);font-weight:700;pointer-events:none}
+#counter{color:var(--accent);letter-spacing:.16em}
+#bar{position:absolute;left:0;right:0;bottom:0;height:5px;z-index:60;
+  background:rgba(255,255,255,.07)}
+#barFill{display:block;height:100%;width:0;border-radius:0 4px 4px 0;
+  background:linear-gradient(90deg,var(--accent),var(--accent3) 50%,var(--accent2) 85%,var(--pink));
+  box-shadow:0 0 16px rgba(52,211,153,.65);transition:width .45s cubic-bezier(.22,1,.36,1)}
+#controls{position:absolute;right:24px;bottom:24px;z-index:70;display:flex;gap:10px}
+#controls button{width:48px;height:48px;border-radius:14px;cursor:pointer;
+  border:1px solid rgba(52,211,153,.38);background:rgba(8,23,42,.78);color:var(--text);
+  font-size:19px;display:grid;place-items:center;backdrop-filter:blur(9px);
+  transition:transform .22s ease, background .22s ease, box-shadow .22s ease}
+#controls button:hover{background:rgba(52,211,153,.24);transform:translateY(-3px);
+  box-shadow:0 10px 24px rgba(52,211,153,.28)}
+#controls button:active{transform:translateY(0) scale(.94)}
+#hint{position:absolute;left:50%;bottom:26px;transform:translateX(-50%);z-index:65;
+  font-size:14.5px;font-weight:700;letter-spacing:.1em;color:var(--muted);
+  padding:9px 20px;border-radius:999px;background:rgba(8,23,42,.7);
+  border:1px solid rgba(52,211,153,.3);backdrop-filter:blur(8px);
+  pointer-events:none;transition:opacity .5s ease;animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:.55;transform:translateX(-50%) scale(1)}
+  50%{opacity:1;transform:translateX(-50%) scale(1.04)}}
+
+/* ============ COVER ============ */
+.coverGlow{position:absolute;width:880px;height:880px;border-radius:50%;
+  background:radial-gradient(circle,rgba(52,211,153,.24),transparent 62%);
+  top:-360px;right:-260px;filter:blur(12px);pointer-events:none;
+  animation:float 10s ease-in-out infinite}
+.coverGlow.b{width:720px;height:720px;left:-300px;bottom:-320px;top:auto;right:auto;
+  background:radial-gradient(circle,rgba(251,146,60,.2),transparent 64%);
+  animation-delay:-4s}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(34px)}}
+</style>
+</head>
+<body>
+<div id="viewport">
+<div id="stage">
+
+  <!-- ===================== 1. COVER ===================== -->
+  <section class="slide tr0 active">
+    <div class="coverGlow"></div>
+    <div class="coverGlow b"></div>
+    <div class="body center">
+      <div class="eyebrow">Tim MGMP Informatika · SMP Negeri 19 Kota Bekasi</div>
+      <h1 class="title grad">Pemecahan Masalah Terpadu<br>Graf &amp; Tree</h1>
+      <p class="sub f">Studi Kasus &amp; Diagram Digital</p>
+      <div class="row f">
+        <span class="chip">Kelas IX · Fase D</span>
+        <span class="chip blue">Informatika</span>
+        <span class="chip orange">Berpikir Komputasional</span>
+        <span class="chip">2 × 40 menit</span>
+      </div>
+      <div class="row f">
+        <span class="badge">Discovery Learning</span>
+        <span class="badge">Pembelajaran Mendalam</span>
+        <span class="badge">UDL</span>
+        <span class="badge">Computational Thinking</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== 2. TUJUAN ===================== -->
+  <section class="slide">
+    <div class="head">
+      <div class="eyebrow">Tujuan Pembelajaran</div>
+      <h2 class="title">Apa yang Akan Kita Capai?</h2>
+    </div>
+    <div class="body">
+      <ul class="bullets">
+        <li class="f">Menjelaskan perbedaan fungsi graf dan tree.</li>
+        <li class="f">Mengidentifikasi objek, hubungan, dan aturan masalah.</li>
+        <li class="f">Memilih model graf atau tree yang sesuai.</li>
+        <li class="f">Membuat diagram digital sederhana dan jelas.</li>
+        <li class="f">Menyusun strategi dari pola hubungan diagram.</li>
+        <li class="f">Mempresentasikan model, alasan, dan strategi.</li>
+      </ul>
+      <div class="row f">
+        <span class="chip">Memahami</span>
+        <span class="chip blue">Mengaplikasi</span>
+        <span class="chip orange">Merefleksi</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== 3. APERSEPSI ===================== -->
+  <section class="slide">
+    <div class="head">
+      <div class="eyebrow">Apersepsi</div>
+      <h2 class="title">Pertanyaan Pemantik</h2>
+    </div>
+    <div class="body">
+      <div class="bubble f">Jika kamu mencari rute dari rumah ke sekolah melalui beberapa jalan, bagaimana cara menggambar hubungan antarjalan itu?</div>
+      <div class="grid g3" style="margin-top:10px">
+        <div class="card f"><span class="ico">🗺️</span><h3>Rute Jalan</h3><p>Tempat mana yang saling terhubung?</p></div>
+        <div class="card blue f"><span class="ico">📁</span><h3>Folder Komputer</h3><p>Mengapa bentuknya seperti pohon bercabang?</p></div>
+        <div class="card gold f"><span class="ico">🚧</span><h3>Satu Jalan Ditutup</h3><p>Apakah strategi kita masih berlaku?</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== 4. PEMAHAMAN BERMAKNA ===================== -->
+  <section class="slide">
+    <div class="head">
+      <div class="eyebrow">Pemahaman Bermakna</div>
+      <h2 class="title">Mengapa Ini Penting?</h2>
+    </div>
+    <div class="body">
+      <ul class="bullets gold">
+        <li class="f">Banyak masalah berisi hubungan antarbenda atau tempat.</li>
+        <li class="f">Diagram membantu melihat hubungan yang sulit dijelaskan.</li>
+        <li class="f">Graf untuk hubungan bebas yang saling terhubung.</li>
+        <li class="f">Tree untuk hubungan bertingkat dari satu akar.</li>
+        <li class="f">Model yang baik tidak harus rumit, yang penting membantu.</li>
+        <li class="f">Perubahan satu aturan dapat mengubah strategi kita.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ===================== 5. GRAF ===================== -->
+  <section class="slide">
+    <div class="head">
+      <div class="eyebrow">Konsep Dasar · 1</div>
+      <h2 class="title">Graf: Peta Hubungan</h2>
+    </div>
+    <div class="body">
+      <div class="grid g2">
+        <div class="card f"><h3>🗺️ Analogi Peta Jalan</h3><p>Titik = tempat. Garis = jalan penghubung.</p></div>
+        <div class="card blue f"><h3>👥 Analogi Pertemanan</h3><p>Titik = orang. Garis = saling mengenal.</p></div>
+      </div>
+      <table class="sm f">
+        <thead><tr><th>Istilah</th><th>Arti Sederhana</th><th>Contoh</th></tr></thead>
+        <tbody>
+          <tr><td>Simpul</td><td>Objek atau tempat yang dimodelkan</td><td>Sekolah, halte, rumah</td></tr>
+          <tr><td>Sisi</td><td>Hubungan antara dua objek</td><td>Jalan penghubung dua tempat</td></tr>
+          <tr><td>Jalur</td><td>Urutan simpul yang dilalui</td><td>Rumah → halte → sekolah</td></tr>
+          <tr><td>Bobot</td><td>Nilai pada sebuah hubungan</td><td>5 menit, 2 km, Rp5.000</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ===================== 6. TREE ===================== -->
+  <section class="slide">
+    <div class="head">
+      <div class="eyebrow">Konsep Dasar · 2</div>
+      <h2 class="title">Tree: Hubungan Bertingkat</h2>
+    </div>
+    <div class="body">
+      <div class="grid g2">
+        <div class="card gold f"><h3>📂 Analogi Folder</h3><p>Satu folder utama bercabang jadi subfolder.</p></div>
+        <div class="card pink f"><h3>🏫 Analogi Struktur Kelas</h3><p>Sekolah → kelas → kelompok → anggota.</p></div>
+      </div>
+      <table class="sm f">
+        <thead><tr><th>Istilah</th><th>Arti Sederhana</th><th>Contoh</th></tr></thead>
+        <tbody>
+          <tr><td>Akar (root)</td><td>Titik paling atas atau awal</td><td>Folder Proyek Kelas</td></tr>
+          <tr><td>Induk (parent)</td><td>Simpul di atas simpul lain</td><td>Folder Tugas</td></tr>
+          <tr><td>Anak (child)</td><td>Simpul di bawah induk</td><td>Subfolder Individu</td></tr>
+          <tr><td>Daun (leaf)</td><td>Simpul tanpa anak</td><td>File paling bawah</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ===================== 7. CONTOH NYATA ===================== -->
+  <section class="slide">
+    <div class="head">
+      <div class="eyebrow">Contoh Nyata</div>
+      <h2 class="title">Ada di Sekitar Kita</h2>
+    </div>
+    <div class="body" style="justify-content:center">
+      <div class="grid g4">
+        <div class="card f"><span class="ico">🚌</span><h3>Rute Angkot</h3><p>Halte saling terhubung. Cocok jadi <b>graf</b>.</p></div>
+        <div class="card blue f"><span class="ico">📁</span><h3>Folder Laptop</h3><p>Folder bercabang. Cocok jadi <b>tree</b>.</p></div>
+        <div class="card gold f"><span class="ico">🌳</span><h3>Silsilah Keluarga</h3><p>Kakek → ayah → anak. Cocok jadi <b>tree</b>.</p></div>
+        <div class="card pink f"><span class="ico">🤝</span><h3>Pertemanan Kelas</h3><p>Siapa kenal siapa. Cocok jadi <b>graf</b>.</p></div>
+      </div>
+      <p class="lead f" style="text-align:center;margin-top:6px">Satu masalah bisa punya <span class="hl">lebih dari satu</span> kemungkinan model. Pilih yang paling membantu.</p>
+    </div>
+  </section>
+
+  <!-- ===================== 8. GRAF VS TREE ===================== -->
+  <section class="slide">
+    <div class="head">
+      <div class="eyebrow">Perbandingan</div>
+      <h2 class="title">Graf vs Tree</h2>
+    </div>
+    <div class="body" style="justify-content:center">
+      <table class="f">
+        <thead><tr><th>Aspek</th><th>Graf</th><th>Tree</th></tr></thead>
+        <tbody>
+          <tr><td>Bentuk hubungan</td><td>Bebas, dapat saling terhubung</td><td>Bertingkat dan bercabang</td></tr>
+          <tr><td>Titik awal</td><td>Tidak harus punya satu akar</td><td>Umumnya punya satu akar</td></tr>
+          <tr><td>Contoh</td><td>Jaringan jalan, rute, pertemanan</td><td>Folder, struktur organisasi</td></tr>
+          <tr><td>Kegunaan</td><td>Menganalisis koneksi dan rute</td><td>Mengorganisasi informasi bertingkat</td></tr>
+          <tr><td>Boleh ada siklus?</td><td>Boleh (A–B–C–A)</td><td>Tidak boleh kembali ke atas</td></tr>
+        </tbody>
+      </table>
+      <div class="row f" style="justify-content:center;margin-top:6px">
+        <span class="chip">Graf = jaringan</span>
+        <span class="chip orange">Tree = hierarki</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== 9. BENTUK / KATEGORI ===================== -->
+  <section class="slide">
+    <div class="head">
+      <div class="eyebrow">Inti Materi</div>
+      <h2 class="title">Tiga Bentuk Model</h2>
+    </div>
+    <div class="body" style="justify-content:center">
+      <div class="grid g3">
+        <div class="card f">
+          <span class="ico">🔗</span>
+          <h3>Graf Tak Berarah</h3>
+          <p>Garis dua arah. Contoh: jalan dua arah, pertemanan.</p>
+        </div>
+        <div class="card blue f">
+          <span class="ico">➡️</span>
+          <h3>Graf Berarah</h3>
+          <p>Garis satu arah. Contoh: jalan satu arah, alur panah.</p>
+        </div>
+        <div class="card gold f">
+          <span class="ico">🌲</span>
+          <h3>Tree</h3>
+          <p>Satu akar, bercabang ke bawah. Contoh: folder, silsilah.</p>
+        </div>
+      </div>
+      <p class="lead f" style="text-align:center">Tambahkan <span class="hl2">bobot</span> bila ada jarak, waktu, atau biaya pada hubungan.</p>
+    </div>
+  </section>
+
+  <!-- ===================== 10. BERTAHAP ===================== -->
+  <section class="slide">
+    <div class="head">
+      <div class="eyebrow">Penjelasan Bertahap</div>
+      <h2 class="title">Dari Cerita Menjadi Model</h2>
+    </div>
+    <div class="body">
+      <div class="row f">
+        <span class="chip">Simpul</span>
+        <span class="chip blue">Sisi</span>
+        <span class="chip orange">Bobot</span>
+        <span class="chip">Jalur</span>
+      </div>
+      <div class="code sm f"><span class="c"># Kasus: rute menuju laboratorium komputer</span>
+Simpul : Kelas, Koridor, Tangga, Lab, Perpus
+Sisi   : Kelas–Koridor, Koridor–Tangga,
+         Tangga–Lab, Koridor–Perpus
+Bobot  : 2 menit, 3 menit, 1 menit, 4 menit
+Jalur  : Kelas → Koridor → Tangga → Lab</div>
+      <ul class="bullets blue" style="gap:10px">
+        <li class="f" style="font-size:20px">Simpul = <b>apa</b> yang dibicarakan.</li>
+        <li class="f" style="font-size:20px">Sisi = <b>bagaimana</b> objek itu berhubungan.</li>
+        <li class="f" style="font-size:20px">Bobot = <b>seberapa</b> besar nilainya.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ===================== 11. CARA KERJA ===================== -->
+  <section class="slide">
+    <div class="head">
+      <div class="eyebrow">Alur Berpikir</div>
+      <h2 class="title">Delapan Langkah Pemecahan Masalah</h2>
+    </div>
+    <div class="body" style="justify-content:center">
+      <div class="grid g2">
+        <ol class="steps">
+          <li class="f">Pahami masalah dan aturannya.</li>
+          <li class="f">Pecah masalah jadi bagian kecil.</li>
+          <li class="f">Tentukan objek dan hubungannya.</li>
+          <li class="f">Pilih model: graf, tree, atau campuran.</li>
+        </ol>
+        <ol class="steps" start="5" style="counter-reset:st 4">
+          <li class="f">Buat diagram digital sederhana.</li>
+          <li class="f">Uji diagram dengan contoh kecil.</li>
+          <li class="f">Susun strategi dan bandingkan solusi.</li>
+          <li class="f">Jelaskan hasil dan refleksikan.</li>
+        </ol>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== 12. FLOWCHART ===================== -->
+  <section class="slide">
+    <div class="head">
+      <div class="eyebrow">Flowchart</div>
+      <h2 class="title">Bagaimana Memilih Model?</h2>
+    </div>
+    <div class="body">
+      <div class="flowchart">
+        <div class="frow">
+          <div class="node oval f">Mulai</div>
+          <div class="arrow f">→</div>
+          <div class="node f">Tandai objek &amp; hubungan</div>
+          <div class="arrow f">→</div>
+          <div class="node f">Tentukan aturan &amp; tujuan</div>
+        </div>
+        <div class="frow" style="min-height:158px">
+          <div class="node diamond f"><span>Hubungan bertingkat &amp; satu akar?</span></div>
+        </div>
+        <div class="frow">
+          <div class="branchLabel f">YA</div>
+          <div class="node oval f">Tree</div>
+          <div class="branchLabel f" style="color:var(--accent3)">TIDAK</div>
+          <div class="node oval f" style="background:rgba(96,165,250,.16);border-color:rgba(96,165,250,.55);color:#C6E0FF">Graf</div>
+        </div>
+        <div class="frow">
+          <div class="node f">Buat diagram digital</div>
+          <div class="arrow f">→</div>
+          <div class="node f">Uji &amp; susun strategi</div>
+          <div class="arrow f">→</div>
+          <div class="node oval f">Selesai</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== 13. STUDI KASUS 1 ===================== -->
+  <section class="slide">
+    <div class="head">
+      <div class="eyebrow">Studi Kasus · 1</div>
+      <h2 class="title">Rute Aman ke Laboratorium</h2>
+    </div>
+    <div class="body">
+      <p class="lead f">Beberapa titik dapat dilewati: <span class="hl">kelas, koridor, tangga, perpustakaan, laboratorium</span>. Saat jam tertentu satu koridor ditutup.</p>
+      <div class="flow f">
+        <div class="node f">Kelas</div>
+        <div class="arrow f">→</div>
+        <div class="node f">Koridor</div>
+        <div class="arrow f">→</div>
+        <div class="node f">Tangga</div>
+        <div class="arrow f">→</div>
+        <div class="node oval f">Lab</div>
+      </div>
+      <div class="flow f">
+        <div class="branchLabel">cabang</div>
+        <div class="arrow f">↳</div>
+        <div class="node f" style="background:rgba(251,146,60,.14);border-color:rgba(251,146,60,.5)">Perpustakaan</div>
+      </div>
+      <div class="grid g3" style="margin-top:6px">
+        <div class="card f"><h3>Model</h3><p>Graf, karena banyak pilihan jalur.</p></div>
+        <div class="card blue f"><h3>Simpul</h3><p>Titik-titik tempat yang dilewati.</p></div>
+        <div class="card gold f"><h3>Aturan</h3><p>Koridor tertentu bisa ditutup.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== 14. STUDI KASUS 2 ===================== -->
+  <section class="slide">
+    <div class="head">
+      <div class="eyebrow">Studi Kasus · 2</div>
+      <h2 class="title">Struktur Folder Proyek Kelas</h2>
+    </div>
+    <div class="body">
+      <div class="tree">
+        <div class="tnode root f">Proyek Kelas</div>
+        <div class="trow">
+          <div class="tcol"><div class="tnode f">Materi</div></div>
+          <div class="tcol">
+            <div class="tnode f">Tugas</div>
+            <div class="trow" style="gap:22px;padding-top:18px">
+              <div class="tnode leaf f">Individu</div>
+              <div class="tnode leaf f">Kelompok</div>
+            </div>
+          </div>
+          <div class="tcol"><div class="tnode f">Presentasi</div></div>
+          <div class="tcol"><div class="tnode f">Dokumentasi</div></div>
+        </div>
+      </div>
+      <p class="lead f" style="text-align:center">Karena <span class="hl">bertingkat dan satu akar</span>, model yang tepat adalah <span class="hl2">tree</span>.</p>
+    </div>
+  </section>
+
+  <!-- ===================== 15. KODE ===================== -->
+  <section class="slide">
+    <div class="head">
+      <div class="eyebrow">Kode Sederhana</div>
+      <h2 class="title">Membaca Tetangga pada Graf</h2>
+    </div>
+    <div class="body">
+      <div class="code sm f"><span class="c"># 1. Tentukan simpul (objek)</span>
+simpul = [<span class="s">"Kelas"</span>, <span class="s">"Koridor"</span>, <span class="s">"Tangga"</span>, <span class="s">"Lab"</span>, <span class="s">"Perpus"</span>]
+
+<span class="c"># 2. Tentukan sisi (hubungan)</span>
+sisi = [(<span class="s">"Kelas"</span>,<span class="s">"Koridor"</span>), (<span class="s">"Koridor"</span>,<span class="s">"Tangga"</span>),
+        (<span class="s">"Tangga"</span>,<span class="s">"Lab"</span>), (<span class="s">"Koridor"</span>,<span class="s">"Perpus"</span>)]
+
+<span class="c"># 3. Fungsi mencari tetangga sebuah titik</span>
+<span class="k">def</span> tetangga(t):
+    hasil = []
+    <span class="k">for</span> a, b <span class="k">in</span> sisi:
+        <span class="k">if</span> a == t: hasil.append(b)
+        <span class="k">if</span> b == t: hasil.append(a)
+    <span class="k">return</span> hasil
+
+<span class="k">print</span>(tetangga(<span class="s">"Koridor"</span>))   <span class="c"># ['Kelas','Tangga','Perpus']</span></div>
+      <p class="lead f">Model yang sama dapat dipakai untuk mencari <span class="hl3">jalur alternatif</span> saat satu sisi ditutup.</p>
+    </div>
+  </section>
+
+  <!-- ===================== 16. KESALAHAN UMUM ===================== -->
+  <section class="slide">
+    <div class="head">
+      <div class="eyebrow">Peringatan</div>
+      <h2 class="title">Kesalahan yang Sering Terjadi</h2>
+    </div>
+    <div class="body" style="justify-content:center">
+      <div class="grid g2">
+        <div class="card pink f">
+          <h3>❌ Sering Salah</h3>
+          <p>• Memasukkan objek yang tidak relevan.<br>
+             • Tidak memberi label pada simpul.<br>
+             • Menggambar hubungan yang tidak ada.<br>
+             • Menganggap semua cabang adalah tree.<br>
+             • Memberi strategi tanpa bukti diagram.</p>
+        </div>
+        <div class="card f" style="border-color:rgba(52,211,153,.45)">
+          <h3>✅ Sebaiknya</h3>
+          <p>• Hanya pakai objek penting.<br>
+             • Beri nama setiap simpul.<br>
+             • Sesuaikan dengan aturan kasus.<br>
+             • Periksa akar dan arah hubungan.<br>
+             • Tunjukkan bagian diagram pendukungnya.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== 17. ANALOGI TAMBAHAN ===================== -->
+  <section class="slide">
+    <div class="head">
+      <div class="eyebrow">Analogi</div>
+      <h2 class="title">Peta Jalan vs Folder Komputer</h2>
+    </div>
+    <div class="body">
+      <p class="lead f">Bayangkan <span class="hl">peta jalan</span> — kamu bisa berputar arah dan kembali ke titik awal. Itulah <b>graf</b>.</p>
+      <p class="lead f">Bayangkan <span class="hl2">folder komputer</span> — kamu masuk makin dalam, tidak bisa kembali lewat jalur lain. Itulah <b>tree</b>.</p>
+      <div class="code sm f"><span class="c"># Graf: boleh ada siklus</span>
+A — B — C
+|_______|
+
+<span class="c"># Tree: tidak ada siklus, satu akar</span>
+        Akar
+       /    \
+   Anak A   Anak B
+   /
+Daun</div>
+    </div>
+  </section>
+
+  <!-- ===================== 18. AKTIVITAS KELOMPOK ===================== -->
+  <section class="slide">
+    <div class="head">
+      <div class="eyebrow">Aktivitas Kelompok</div>
+      <h2 class="title">Misi Detektif Struktur</h2>
+    </div>
+    <div class="body" style="justify-content:center">
+      <div class="grid g4">
+        <div class="card f"><span class="ico">🧭</span><h3>Kasus 1</h3><p>Rute aman menuju ruang laboratorium.</p></div>
+        <div class="card blue f"><span class="ico">📁</span><h3>Kasus 2</h3><p>Struktur folder proyek kelas.</p></div>
+        <div class="card gold f"><span class="ico">🎯</span><h3>Kasus 3</h3><p>Jaringan rekomendasi kegiatan minat.</p></div>
+        <div class="card pink f"><span class="ico">🔄</span><h3>Tantangan</h3><p>Ubah satu aturan, periksa modelnya.</p></div>
+      </div>
+      <div class="row f" style="justify-content:center">
+        <span class="chip">Tim 3–4 orang</span>
+        <span class="chip blue">Pembaca kasus</span>
+        <span class="chip orange">Pembuat model</span>
+        <span class="chip">Pemeriksa</span>
+        <span class="chip blue">Penyaji</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== 19. LANGKAH KERJA ===================== -->
+  <section class="slide">
+    <div class="head">
+      <div class="eyebrow">Langkah Kerja</div>
+      <h2 class="title">Apa yang Harus Kalian Lakukan?</h2>
+    </div>
+    <div class="body">
+      <ol class="steps">
+        <li class="f">Baca kasus, tandai objek dan aturannya.</li>
+        <li class="f">Tentukan tujuan dan titik awal perjalanan.</li>
+        <li class="f">Pilih model: graf atau tree, tulis alasannya.</li>
+        <li class="f">Gambar diagram digital, beri label lengkap.</li>
+        <li class="f">Uji, susun strategi, lalu presentasi 2 menit.</li>
+      </ol>
+      <div class="timeline">
+        <div class="tl f"><b>Pendahuluan</b>10 menit · orientasi</div>
+        <div class="tl f"><b>Memahami</b>15 menit · eksplorasi konsep</div>
+        <div class="tl f"><b>Mengaplikasi</b>35 menit · membuat model</div>
+        <div class="tl f"><b>Merefleksi</b>10 menit · umpan balik</div>
+        <div class="tl f"><b>Penutup</b>10 menit · simpulan</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== 20. KUIS KILAT ===================== -->
+  <section class="slide">
+    <div class="head">
+      <div class="eyebrow">Cek Pemahaman</div>
+      <h2 class="title">Kuis Kilat</h2>
+    </div>
+    <div class="body" style="justify-content:center">
+      <div class="grid g2">
+        <div class="card f">
+          <div class="qa">
+            <div class="q">1. Struktur folder lebih mirip graf atau tree?</div>
+            <div class="a f">Tree, karena bertingkat dan bercabang.</div>
+          </div>
+        </div>
+        <div class="card blue f">
+          <div class="qa">
+            <div class="q">2. Pada peta jalan, apa yang menjadi simpul?</div>
+            <div class="a f">Tempat atau titik lokasi.</div>
+          </div>
+        </div>
+        <div class="card gold f">
+          <div class="qa">
+            <div class="q">3. Mengapa diagram membantu memecahkan masalah?</div>
+            <div class="a f">Hubungan jadi lebih mudah dilihat dan dianalisis.</div>
+          </div>
+        </div>
+        <div class="card pink f">
+          <div class="qa">
+            <div class="q">4. Jika satu jalan ditutup, apa yang diperiksa?</div>
+            <div class="a f">Jalur dan hubungan yang terdampak.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== 21. REFLEKSI ===================== -->
+  <section class="slide">
+    <div class="head">
+      <div class="eyebrow">Aktivitas Reflektif</div>
+      <h2 class="title">Melihat Kembali Proses Kita</h2>
+    </div>
+    <div class="body" style="justify-content:center">
+      <div class="grid g3">
+        <div class="card f"><h3>🤔 Kesulitan</h3><p>Bagian mana yang paling sulit dimodelkan? Mengapa?</p></div>
+        <div class="card blue f"><h3>🔧 Perubahan</h3><p>Jika satu hubungan dihapus, apa yang berubah?</p></div>
+        <div class="card gold f"><h3>💬 Umpan Balik</h3><p>Satu kekuatan model kelompok lain?</p></div>
+      </div>
+      <div class="bubble f" style="margin-top:8px;font-size:20px">Exit ticket: satu hal yang saya pahami hari ini adalah … dan satu hal yang masih membingungkan adalah …</div>
+    </div>
+  </section>
+
+  <!-- ===================== 22. RUBRIK ===================== -->
+  <section class="slide">
+    <div class="head">
+      <div class="eyebrow">Rubrik Penilaian</div>
+      <h2 class="title">Bagaimana Karya Kita Dinilai?</h2>
+    </div>
+    <div class="body" style="justify-content:center">
+      <table class="sm f">
+        <thead><tr><th>Aspek</th><th>4 — Sangat Baik</th><th>3 — Baik</th><th>2 — Berkembang</th><th>1 — Perlu Bimbingan</th></tr></thead>
+        <tbody>
+          <tr><td>Pengetahuan</td><td>Konsep dan contoh tepat</td><td>Sedikit kekurangan</td><td>Masih tertukar</td><td>Belum paham dasar</td></tr>
+          <tr><td>Keterampilan</td><td>Model lengkap dan konsisten</td><td>Cukup lengkap</td><td>Beberapa label kurang tepat</td><td>Belum menggambarkan masalah</td></tr>
+          <tr><td>Kolaborasi</td><td>Berbagi peran dan membantu</td><td>Bekerja sama baik</td><td>Belum konsisten</td><td>Pasif</td></tr>
+          <tr><td>Penalaran Kritis</td><td>Alasan kuat berbasis bukti</td><td>Logis dan didukung</td><td>Alasan umum</td><td>Belum bisa menjelaskan</td></tr>
+          <tr><td>Refleksi</td><td>Spesifik dan berencana</td><td>Cukup jelas</td><td>Masih umum</td><td>Sangat singkat</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ===================== 23. RANGKUMAN ===================== -->
+  <section class="slide">
+    <div class="head">
+      <div class="eyebrow">Rangkuman</div>
+      <h2 class="title">Poin Penting Hari Ini</h2>
+    </div>
+    <div class="body" style="justify-content:center">
+      <ul class="bullets gold">
+        <li class="f">Graf memodelkan hubungan bebas yang saling terhubung.</li>
+        <li class="f">Tree memodelkan hubungan bertingkat dari satu akar.</li>
+        <li class="f">Simpul, sisi, dan bobot adalah bahan dasar model.</li>
+        <li class="f">Diagram adalah alat berpikir, bukan sekadar gambar.</li>
+        <li class="f">Model yang baik membantu memilih strategi tepat.</li>
+        <li class="f">Jika aturan berubah, periksa kembali model kita.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ===================== 24. TINDAK LANJUT ===================== -->
+  <section class="slide">
+    <div class="head">
+      <div class="eyebrow">Tindak Lanjut</div>
+      <h2 class="title">Setelah Pertemuan Ini</h2>
+    </div>
+    <div class="body" style="justify-content:center">
+      <div class="grid g2">
+        <div class="card f">
+          <span class="ico">🏠</span>
+          <h3>Tugas Rumah</h3>
+          <p>Amati satu masalah di rumah atau sekolah. Buat diagram graf atau tree sederhana, beri label, lalu tulis 3 langkah strateginya.</p>
+        </div>
+        <div class="card blue f">
+          <span class="ico">➡️</span>
+          <h3>Pertemuan Berikutnya</h3>
+          <p>Membandingkan dua model untuk masalah yang sama dan menguji apa yang terjadi saat satu hubungan berubah.</p>
+        </div>
+      </div>
+      <div class="row f" style="justify-content:center">
+        <span class="chip">Kumpulkan LKPD</span>
+        <span class="chip orange">Isi exit ticket</span>
+        <span class="chip blue">Simpan diagram digital</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== 25. PENUTUP ===================== -->
+  <section class="slide">
+    <div class="coverGlow"></div>
+    <div class="coverGlow b"></div>
+    <div class="body center">
+      <div class="eyebrow">Tim MGMP Informatika</div>
+      <h2 class="title grad" style="font-size:46px">Terima Kasih</h2>
+      <p class="sub f">SMP Negeri 19 Kota Bekasi</p>
+      <div class="bubble f" style="max-width:900px;text-align:center;border-radius:20px">
+        Masalah yang rumit menjadi sederhana ketika kita berani menggambarnya.
+      </div>
+      <div class="row f">
+        <span class="chip">Berpikir Komputasional</span>
+        <span class="chip blue">Kelas IX · Fase D</span>
+        <span class="chip orange">Graf &amp; Tree</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== HUD ===================== -->
+  <div id="hud">
+    <div>Informatika · Graf &amp; Tree · SMPN 19 Kota Bekasi</div>
+    <div id="counter">1 / 25</div>
+  </div>
+
+  <div id="controls">
+    <button id="btnPrev" title="Sebelumnya (←)">◀</button>
+    <button id="btnNext" title="Lanjut (→)">▶</button>
+    <button id="btnFull" title="Layar penuh (F)">⛶</button>
+  </div>
+
+  <div id="hint">Klik / tekan → untuk lanjut</div>
+  <div id="bar"><i id="barFill"></i></div>
+
+</div>
+</div>
+
+<script>
+(function(){
+  const stage    = document.getElementById('stage');
+  const slides   = Array.prototype.slice.call(document.querySelectorAll('.slide'));
+  const barFill  = document.getElementById('barFill');
+  const counter  = document.getElementById('counter');
+  const hint     = document.getElementById('hint');
+  let cur = 0;
+
+  /* ---------- skala otomatis 16:9 ---------- */
+  function fit(){
+    const s = Math.min(window.innerWidth / 1280, window.innerHeight / 720);
+    stage.style.transform = 'scale(' + s + ')';
+  }
+  window.addEventListener('resize', fit);
+  fit();
+
+  /* ---------- inisialisasi posisi slide ---------- */
+  slides.forEach(function(s, i){
+    s.classList.remove('prev','next','tr0','tr1','tr2','tr3','tr4');
+    if(i !== 0) s.classList.add('next');
+  });
+  slides[0].classList.add('tr0');
+
+  function updateHUD(){
+    counter.textContent = (cur + 1) + ' / ' + slides.length;
+    barFill.style.width = ((cur + 1) / slides.length * 100) + '%';
+    hint.style.opacity = (cur === 0) ? '1' : '0';
+  }
+
+  function goTo(i){
+    if(i < 0 || i >= slides.length || i === cur) return;
+    const old = slides[cur];
+    old.classList.remove('active','tr0','tr1','tr2','tr3','tr4');
+    old.classList.add(i > cur ? 'prev' : 'next');
+
+    cur = i;
+    const s = slides[cur];
+    s.classList.remove('prev','next','tr0','tr1','tr2','tr3','tr4');
+    void s.offsetWidth;
+    s.classList.add('tr' + (cur % 5));
+    s.classList.add('active');
+    updateHUD();
+  }
+
+  function nextStep(){
+    const s = slides[cur];
+    const pending = s.querySelectorAll('.f:not(.show)');
+    if(pending.length){
+      pending[0].classList.add('show');
+      return;
+    }
+    if(cur < slides.length - 1) goTo(cur + 1);
+  }
+
+  function prevStep(){
+    const s = slides[cur];
+    const shown = s.querySelectorAll('.f.show');
+    if(shown.length){
+      shown[shown.length - 1].classList.remove('show');
+      return;
+    }
+    if(cur > 0) goTo(cur - 1);
+  }
+
+  /* ---------- klik di mana saja ---------- */
+  stage.addEventListener('click', function(e){
+    if(e.target.closest('#controls')) return;
+    nextStep();
+  });
+
+  /* ---------- tombol ---------- */
+  document.getElementById('btnNext').addEventListener('click', function(e){
+    e.stopPropagation(); nextStep();
+  });
+  document.getElementById('btnPrev').addEventListener('click', function(e){
+    e.stopPropagation(); prevStep();
+  });
+  document.getElementById('btnFull').addEventListener('click', function(e){
+    e.stopPropagation(); toggleFS();
+  });
+
+  /* ---------- keyboard ---------- */
+  function toggleFS(){
+    if(!document.fullscreenElement){
+      if(document.documentElement.requestFullscreen) document.documentElement.requestFullscreen();
+    } else {
+      if(document.exitFullscreen) document.exitFullscreen();
+    }
+  }
+
+  window.addEventListener('keydown', function(e){
+    const k = e.key;
+    if(k === 'ArrowRight' || k === 'ArrowDown' || k === ' ' || k === 'PageDown' || k === 'Enter'){
+      e.preventDefault(); nextStep();
+    } else if(k === 'ArrowLeft' || k === 'ArrowUp' || k === 'PageUp'){
+      e.preventDefault(); prevStep();
+    } else if(k === 'Home'){
+      e.preventDefault(); goTo(0);
+    } else if(k === 'End'){
+      e.preventDefault(); goTo(slides.length - 1);
+    } else if(k === 'f' || k === 'F'){
+      e.preventDefault(); toggleFS();
+    }
+  });
+
+  updateHUD();
+})();
+</script>
+</body>
+</html>
